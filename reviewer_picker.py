@@ -296,19 +296,25 @@ def pick_reviewers(pr: PR, away: set[str] | None = None) -> Pick:
     # --- Slot 1: the risk seat -------------------------------------------
     slot1: str | None = None
     if tier == 1:
-        # Yazan, with Olga stepping in when he's away OR is the author.
-        if YAZAN not in base_exclude:
+        # If a senior is ALREADY a reviewer on the PR (e.g. the author tagged
+        # them manually), that seat is filled — don't warn, don't double-add.
+        senior_already = [s for s in (YAZAN, OLGA) if s in pr.already_requested]
+        if senior_already:
+            reasons.append(f"Tier 1 senior already on the PR ({', '.join(senior_already)})")
+        elif YAZAN not in base_exclude:
             slot1 = YAZAN
-        elif OLGA not in (set(away) | set(pr.already_requested)) and pr.author != OLGA:
+        elif OLGA not in (set(away) | {pr.author}):
             slot1 = OLGA
             reasons.append("Yazan unavailable/author -> Olga steps into Tier 1")
         else:
-            reasons.append("WARNING: both Yazan and Olga unavailable for Tier 1 — PR will wait")
+            reasons.append("WARNING: no Tier 1 senior available — PR must wait for Yazan or Olga")
     elif tier == 2:
-        # Olga primary, Yazan backs up.
-        if OLGA not in base_exclude:
+        senior_already = [s for s in (OLGA, YAZAN) if s in pr.already_requested]
+        if senior_already:
+            reasons.append(f"Tier 2 senior already on the PR ({', '.join(senior_already)})")
+        elif OLGA not in base_exclude:
             slot1 = OLGA
-        elif YAZAN not in (set(away) | set(pr.already_requested)) and pr.author != YAZAN:
+        elif YAZAN not in (set(away) | {pr.author}):
             slot1 = YAZAN
             reasons.append("Olga unavailable/author -> Yazan backs up Tier 2")
         else:
