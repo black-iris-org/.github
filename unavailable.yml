@@ -2,3 +2,6 @@
 # Add: name + return date. Expired entries are ignored automatically.
 # - dev: nick
 #   until: 2026-07-15
+
+- dev: olga
+  until: 2026-07-15
