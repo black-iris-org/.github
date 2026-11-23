@@ -9,8 +9,8 @@ Wire it into the PR-open GitHub Action later. Test it standalone now:
     python3 reviewer_picker.py        # runs the demo cases at the bottom
 
 Tier ladder (severity, not backend-vs-frontend):
-  Tier 1 -> Yazan      (Olga steps in when Yazan is away/is the author)
-  Tier 2 -> Olga       (Yazan backs up when Olga is away/is the author)
+  Tier 1 -> Yazan      (Shabab steps in when Yazan is away/is the author)
+  Tier 2 -> Shabab     (Yazan backs up when Shabab is away/is the author)
   Tier 3 -> Shabab / Farhad / Nick   (round-robin, the default home)
   Tier 4 -> Alex / Gillian folded into Tier 3 ~1-in-3 on trivial PRs only
 """
@@ -26,7 +26,6 @@ from datetime import date
 # PEOPLE  ->  GitHub handles
 # ---------------------------------------------------------------------------
 YAZAN = "yazan9"
-OLGA = "Olga-h-h"
 SHABAB = "shababmoali"
 FARHAD = "farhad-blackiris"
 NICK = "NickEgorenkovBlackIris"
@@ -38,10 +37,10 @@ THROTTLE_IN = [ALEX, GILLIAN]         # folded into slot 2 ~1-in-3 on trivial PR
 THROTTLE_EVERY = 3                    # 1-in-3
 
 # When the Tier-3 pool can't produce a second reviewer (author out, someone
-# away), fall back to Olga for slot 2 — but only if she isn't already buried.
-# "Buried" = this many or more open review requests already on her plate.
-# If no review_load data is supplied, we can't tell, so we pull her in.
-OLGA_OVERLOAD_CAP = 5
+# away), fall back to Shabab for slot 2 — but only if he isn't already buried.
+# "Buried" = this many or more open review requests already on his plate.
+# If no review_load data is supplied, we can't tell, so we pull him in.
+SHABAB_OVERLOAD_CAP = 5
 
 # ===========================================================================
 # >>> TUNE THESE TO BEACON'S ACTUAL REPO LAYOUT <<<
@@ -50,7 +49,7 @@ OLGA_OVERLOAD_CAP = 5
 # downstream just works.
 # ===========================================================================
 
-# --- Tier 1: always you (or Olga when you're out) -------------------------
+# --- Tier 1: always you (or Shabab when you're out) -----------------------
 
 MIGRATION_GLOBS = [
     "db/migrate/*",
@@ -91,7 +90,7 @@ DEPLOY_GLOBS = [
     "bin/deploy*",
 ]
 
-# --- Tier 2: Olga (you backup) --------------------------------------------
+# --- Tier 2: Shabab (you backup) ------------------------------------------
 
 ANGULAR_MODULE_GLOBS = ["**/*.module.ts"]
 WEBSOCKET_MQTT_GLOBS = [
@@ -298,25 +297,25 @@ def pick_reviewers(pr: PR, away: set[str] | None = None) -> Pick:
     if tier == 1:
         # If a senior is ALREADY a reviewer on the PR (e.g. the author tagged
         # them manually), that seat is filled — don't warn, don't double-add.
-        senior_already = [s for s in (YAZAN, OLGA) if s in pr.already_requested]
+        senior_already = [s for s in (YAZAN, SHABAB) if s in pr.already_requested]
         if senior_already:
             reasons.append(f"Tier 1 senior already on the PR ({', '.join(senior_already)})")
         elif YAZAN not in base_exclude:
             slot1 = YAZAN
-        elif OLGA not in (set(away) | {pr.author}):
-            slot1 = OLGA
-            reasons.append("Yazan unavailable/author -> Olga steps into Tier 1")
+        elif SHABAB not in (set(away) | {pr.author}):
+            slot1 = SHABAB
+            reasons.append("Yazan unavailable/author -> Shabab steps into Tier 1")
         else:
-            reasons.append("WARNING: no Tier 1 senior available — PR must wait for Yazan or Olga")
+            reasons.append("WARNING: no Tier 1 senior available — PR must wait for Yazan or Shabab")
     elif tier == 2:
-        senior_already = [s for s in (OLGA, YAZAN) if s in pr.already_requested]
+        senior_already = [s for s in (SHABAB, YAZAN) if s in pr.already_requested]
         if senior_already:
             reasons.append(f"Tier 2 senior already on the PR ({', '.join(senior_already)})")
-        elif OLGA not in base_exclude:
-            slot1 = OLGA
+        elif SHABAB not in base_exclude:
+            slot1 = SHABAB
         elif YAZAN not in (set(away) | {pr.author}):
             slot1 = YAZAN
-            reasons.append("Olga unavailable/author -> Yazan backs up Tier 2")
+            reasons.append("Shabab unavailable/author -> Yazan backs up Tier 2")
         else:
             slot1 = draw_from_pool(TIER3_POOL, pr, base_exclude)
             reasons.append("both seniors unavailable -> Tier 3 covers")
@@ -339,19 +338,19 @@ def pick_reviewers(pr: PR, away: set[str] | None = None) -> Pick:
     slot2 = draw_from_pool(slot2_pool, pr, exclude2)
 
     # Fallback: pool couldn't fill slot 2 (author out, someone away, thin pool).
-    # Pull in Olga as the second reviewer if she's free and not overwhelmed.
-    if slot2 is None and OLGA not in exclude2:
-        olga_buried = (
-            bool(pr.review_load) and pr.review_load.get(OLGA, 0) >= OLGA_OVERLOAD_CAP
+    # Pull in Shabab as the second reviewer if he's free and not overwhelmed.
+    if slot2 is None and SHABAB not in exclude2:
+        shabab_buried = (
+            bool(pr.review_load) and pr.review_load.get(SHABAB, 0) >= SHABAB_OVERLOAD_CAP
         )
-        if olga_buried:
+        if shabab_buried:
             reasons.append(
-                f"pool couldn't fill slot 2 — Olga is at capacity "
-                f"({pr.review_load.get(OLGA, 0)} open), leaving one reviewer"
+                f"pool couldn't fill slot 2 — Shabab is at capacity "
+                f"({pr.review_load.get(SHABAB, 0)} open), leaving one reviewer"
             )
         else:
-            slot2 = OLGA
-            reasons.append("pool couldn't fill slot 2 — Olga pulled in as second")
+            slot2 = SHABAB
+            reasons.append("pool couldn't fill slot 2 — Shabab pulled in as second")
 
     reviewers = [r for r in (slot1, slot2) if r]
     # De-dup defensively (GitHub no-ops a repeat anyway).
@@ -377,7 +376,7 @@ def pick_reviewers(pr: PR, away: set[str] | None = None) -> Pick:
 #     "claude_critical": false,                          # from the API scan
 #     "claude_reason": "",
 #     "already_requested": [],
-#     "review_load": {"Olga-h-h": 2}                     # optional
+#     "review_load": {"shababmoali": 2}                   # optional
 #   }
 #
 # Output JSON (stdout):
